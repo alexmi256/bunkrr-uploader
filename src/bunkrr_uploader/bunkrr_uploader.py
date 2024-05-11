@@ -113,23 +113,15 @@ class BunkrrUploader:
 
         if paths:
             responses = await self.api.upload_files(filtered_paths, folder_id)
-            pprint(responses)
+            # pprint(responses)
 
             if self.options.get("save") is True and responses:
+                # TODO: This should merge them all into superset for all possible fields
+                response_fields = responses[0]["files"][0].values()
                 file_name = f"bunkrr_upload_{int(time.time())}.csv"
                 with open(file_name, "w", newline="") as csvfile:
                     logger.info(f"Saving uploaded files to {file_name}")
-                    field_names = [
-                        "name",
-                        "url",
-                        "fileName",
-                        "albumid",
-                        "uploadSuccess",
-                        "filePath",
-                        "filePathMD5",
-                        "fileNameMD5",
-                    ]
-                    csv_writer = csv.DictWriter(csvfile, dialect="excel", fieldnames=field_names)
+                    csv_writer = csv.DictWriter(csvfile, dialect="excel", fieldnames=response_fields)
                     csv_writer.writeheader()
                     for row in responses:
                         csv_writer.writerow(row["files"][0])
@@ -142,10 +134,7 @@ async def async_main() -> None:
     args = cli()
     logger.debug(args)
 
-    options = {
-        "save": args.save,
-        "chunk_retries": args.chunk_retries
-    }
+    options = {"save": args.save, "chunk_retries": args.chunk_retries}
 
     bunkrr_client = BunkrrUploader(args.token, max_connections=args.connections, retries=args.retries, options=options)
     try:

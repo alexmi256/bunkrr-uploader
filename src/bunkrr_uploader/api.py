@@ -58,7 +58,7 @@ class BunkrrAPI:
         self.created_folders = {}
         self.sem = asyncio.Semaphore(max_connections)
         self.retries = retries
-        self.max_chunk_retries = options.get('chunk_retries') or 1
+        self.max_chunk_retries = options.get("chunk_retries") or 1
 
     async def get_check(self) -> CheckResponse:
         async with self.session.get("/api/check") as resp:
@@ -152,9 +152,25 @@ class BunkrrAPI:
 
     # TODO: This should probably move out of API
     async def upload(self, file: Path, album_id: Optional[str] = None) -> UploadResponse:
+        metadata = {
+            "success": False,
+            "files": [
+                {
+                    "fileName": file.name,
+                    "albumid": album_id,
+                    "filePath": str(file),
+                    "filePathMD5": hashlib.md5(str(file).encode("utf-8")).hexdigest(),
+                    "fileNameMD5": hashlib.md5(str(file.name).encode("utf-8")).hexdigest(),
+                    "uploadSuccess": None,
+                }
+            ],
+        }
         file_size = os.stat(file).st_size
         file_mimetype = mimetypes.guess_type(file)[0] or "application/octet-stream"
         node_response = await self.get_node()
+        if not node_response.get("success"):
+            logger.error(f"Failed to get server to upload to: {pformat(node_response)}")
+            return metadata
         server = "/".join(node_response["url"].split("/")[:3])
 
         if server not in self.server_sessions:
@@ -223,20 +239,7 @@ class BunkrrAPI:
                                                     logger.error(msg)
                                                     raise Exception(msg)
                                                 # chunk_upload_success = True
-                                                response["files"][0].update(
-                                                    {
-                                                        "fileName": file.name,
-                                                        "albumid": album_id,
-                                                        "filePath": str(file),
-                                                        "filePathMD5": hashlib.md5(
-                                                            str(file).encode("utf-8")
-                                                        ).hexdigest(),
-                                                        "fileNameMD5": hashlib.md5(
-                                                            str(file.name).encode("utf-8")
-                                                        ).hexdigest(),
-                                                        "uploadSuccess": response["success"],
-                                                    }
-                                                )
+                                                response.update(metadata)
                                                 return response
                                         except Exception:
                                             finish_chunks_attempt += 1
