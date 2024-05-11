@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "BunkrrUploader"
-version = "0.10.4"
+version = "0.10.5"
 description = "Bunkrr uploader supporting parallel uploads"
 readme = "README.md"
 requires-python = ">=3.9"
