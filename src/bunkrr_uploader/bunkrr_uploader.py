@@ -71,11 +71,13 @@ class BunkrrUploader:
         file_name = (file.name[:240] + "..") if len(file.name) > 240 else file.name
 
         if file.suffix in self.api.file_blacklist:
-            raise Exception(f"File {file} has blacklisted extension {file.suffix}")
+            logger.error(f"File {file} has blacklisted extension {file.suffix}")
+            return []
 
         if file_size > self.api.max_file_size:
             # TODO: Create temporary file archive
-            raise Exception(f"File {file} is bigger than max file size {self.api.max_file_size}")
+            logger.error(f"File {file} is bigger than max file size {self.api.max_file_size}")
+            return []
 
         return [file]
 
