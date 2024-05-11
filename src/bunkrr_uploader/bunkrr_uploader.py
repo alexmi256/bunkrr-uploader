@@ -12,7 +12,7 @@ from .api import BunkrrAPI
 from .cli import cli
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 
 class BunkrrUploader:
@@ -140,7 +140,10 @@ async def async_main() -> None:
     args = cli()
     logger.debug(args)
 
-    options = {"save": args.save}
+    options = {
+        "save": args.save,
+        "chunk_retries": args.chunk_retries
+    }
 
     bunkrr_client = BunkrrUploader(args.token, max_connections=args.connections, retries=args.retries, options=options)
     try:

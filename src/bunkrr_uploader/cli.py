@@ -52,7 +52,13 @@ def cli():
         "--retries",
         default=1,
         type=int,
-        help="How many times to retry a failed chunk, chunk completion, or upload",
+        help="How many times to retry a failed upload",
+    )
+    parser.add_argument(
+        "--chunk-retries",
+        default=1,
+        type=int,
+        help="How many times to retry a failed chunk or chunk completion",
     )
     args = parser.parse_args()
 

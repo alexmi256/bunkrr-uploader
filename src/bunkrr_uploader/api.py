@@ -58,7 +58,7 @@ class BunkrrAPI:
         self.created_folders = {}
         self.sem = asyncio.Semaphore(max_connections)
         self.retries = retries
-        self.max_chunk_retries = retries
+        self.max_chunk_retries = options.get('chunk_retries') or 1
 
     async def get_check(self) -> CheckResponse:
         async with self.session.get("/api/check") as resp:
