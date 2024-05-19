@@ -1,8 +1,13 @@
+import logging
 from io import BufferedReader
 from pathlib import Path
 from typing import Callable, Optional
 
+import multivolumefile
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 class ProgressFileReader(BufferedReader):
@@ -38,3 +43,32 @@ class TqdmUpTo(tqdm):
         if tsize is not None:
             self.total = tsize
         return self.update(b * bsize - self.n)  # also sets self.n = b * bsize
+
+
+def create_multivolume_archive(file_path: Path, volume_size: int) -> list[Path]:
+    temp_files_path = Path.cwd().joinpath("temp")
+
+    if not temp_files_path.exists():
+        logger.info(f"Creating directory for temporary multi volume archive files at {temp_files_path}")
+        temp_files_path.mkdir(parents=True, exist_ok=True)
+    else:
+        logger.info(f"Temporary directory for multi volume archive files already exists at: {temp_files_path}")
+
+    with open(file_path, "rb") as original_file:
+        # The new files will be created in our local temporary path
+        split_file_name = temp_files_path.joinpath(f"{file_path.name}.zip")
+        original_file_data = original_file.read()
+
+        with multivolumefile.open(split_file_name, "wb", volume=volume_size) as vol:
+            with zipfile.ZipFile(vol, "w", compression=zipfile.ZIP_STORED) as archive:  # type: ignore
+                archive.writestr(file_path.name, original_file_data)
+
+    if split_file_name:
+        created_files = [
+            x for x in temp_files_path.iterdir() if x.is_file() and x.name.startswith(split_file_name.name)
+        ]
+        return created_files
+    else:
+        logger.info(f"Failed to create split files")
+
+    return []

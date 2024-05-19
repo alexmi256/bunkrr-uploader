@@ -12,12 +12,13 @@ import aiohttp
 from tqdm.asyncio import tqdm_asyncio
 
 from .types import (
-    AlbumsResponse,
     CheckResponse,
     CreateAlbumResponse,
     NodeResponse,
     UploadResponse,
     VerifyTokenResponse,
+    GetAlbumsResponse,
+    GetAlbumResponse,
 )
 from .util import ProgressFileReader, TqdmUpTo
 
@@ -76,10 +77,20 @@ class BunkrrAPI:
             response = await resp.json()
             return response
 
-    async def get_albums(self) -> AlbumsResponse:
+    async def get_albums(self) -> GetAlbumsResponse:
         async with self.session.get("/api/albums") as resp:
             response = await resp.json()
             return response
+
+    async def get_album(self, album_id: int, page_number: int = 0) -> GetAlbumResponse:
+
+        # TODO: Get the initial page
+        # TODO: Iterate all pages in count
+        async with self.session.get(f"/api/albums/{album_id}/{page_number}") as resp:
+            response = await resp.json()
+            return response
+
+
 
     async def create_album(
         self, name: str, description: str, public: bool = True, download: bool = True

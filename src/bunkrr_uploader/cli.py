@@ -42,6 +42,12 @@ def cli():
         help='Don\'t save uploaded file urls to a "gofile_upload_<unixtime>.csv" file',
     )
     parser.add_argument(
+        "--delete-temp-files",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Delete any multi volume archive temporary files that were created in order to support files exceeding file size limit ",
+    )
+    parser.add_argument(
         "--use-config",
         action=argparse.BooleanOptionalAction,
         default=True,
