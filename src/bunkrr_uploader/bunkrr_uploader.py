@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import functools
 import logging
 import os
 import re
@@ -116,8 +117,8 @@ class BunkrrUploader:
             # pprint(responses)
 
             if self.options.get("save") is True and responses:
-                # TODO: This should merge them all into superset for all possible fields
-                response_fields = responses[0]["files"][0].values()
+                response_fields = list(set().union(*[x.values() for x in responses[0]["files"] if x]))
+
                 file_name = f"bunkrr_upload_{int(time.time())}.csv"
                 with open(file_name, "w", newline="") as csvfile:
                     logger.info(f"Saving uploaded files to {file_name}")
