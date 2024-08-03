@@ -117,7 +117,8 @@ class BunkrrUploader:
             # pprint(responses)
 
             if self.options.get("save") is True and responses:
-                response_fields = list(set().union(*[x.values() for x in responses[0]["files"] if x]))
+                expected_fieldnames = ["albumid", "filePathMD5", "fileNameMD5", "filePath", "fileName", "uploadSuccess"]
+                response_fields = list(set(expected_fieldnames + list(set().union(*[x.keys() for x in responses[0]["files"] if x]))))
 
                 file_name = f"bunkrr_upload_{int(time.time())}.csv"
                 with open(file_name, "w", newline="") as csvfile:
