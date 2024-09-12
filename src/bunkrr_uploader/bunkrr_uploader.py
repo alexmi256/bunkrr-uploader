@@ -1,6 +1,5 @@
 import asyncio
 import csv
-import functools
 import logging
 import os
 import re
@@ -11,6 +10,7 @@ from typing import Any, List, Optional
 
 from .api import BunkrrAPI
 from .cli import cli
+from .util import create_multivolume_archive
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARNING)
@@ -76,9 +76,11 @@ class BunkrrUploader:
             return []
 
         if file_size > self.api.max_file_size:
-            # TODO: Create temporary file archive
+            new_files = create_multivolume_archive(file, volume_size=self.api.max_file_size)
+            # FIXME?: Don't need this since the function that calls this should add these as temp files
+            # self.temporary_files.extend(new_files)
             logger.error(f"File {file} is bigger than max file size {self.api.max_file_size}")
-            return []
+            return new_files
 
         return [file]
 
@@ -90,7 +92,9 @@ class BunkrrUploader:
             if folder is None:
                 folder = path.name
 
-        # The server may not accept certain file types and those over a certain size so we need to create temporary files
+        # The server may not accept certain file types and those over a certain size
+        # Thus we need to create a new file list that removes unsupported files and adds the multivolume files of files
+        # that are too big
         filtered_paths = []
         for file_path in paths:
             filtered_paths.extend(self.prepare_file_for_upload(file_path))
@@ -99,44 +103,56 @@ class BunkrrUploader:
             print("No file paths left to upload")
             return
 
-        # TODO: Delete the extra created files after upload
+        # These temporary files will be deleted after upload completes
         self.temporary_files = [x for x in filtered_paths if x not in paths]
 
         folder_id = None
         if folder:
             existing_folders = await self.api.get_albums()
             existing_folder = next((x for x in existing_folders["albums"] if x["name"] == folder), None)
+            # TODO: We should be able to set existing albums as public or private but I've not looked into the API for this
             if existing_folder:
                 folder_id = str(existing_folder["id"])
             else:
-                created_folder = await self.api.create_album(folder, folder)
+                created_folder = await self.api.create_album(folder, folder, public=self.options["public"])
                 folder_id = str(created_folder["id"])
 
         if paths:
-            responses = await self.api.upload_files(filtered_paths, folder_id)
-            # pprint(responses)
+            try:
+                responses = await self.api.upload_files(filtered_paths, folder_id)
+                # pprint(responses)
 
-            if self.options.get("save") is True and responses:
-                expected_fieldnames = ["albumid", "filePathMD5", "fileNameMD5", "filePath", "fileName", "uploadSuccess"]
-                response_fields = list(set(expected_fieldnames + list(set().union(*[x.keys() for x in responses[0]["files"] if x]))))
+                if self.options.get("save") is True and responses:
+                    expected_fieldnames = ["albumid", "filePathMD5", "fileNameMD5", "filePath", "fileName", "uploadSuccess"]
+                    response_fields = list(set(expected_fieldnames + list(set().union(*[x.keys() for x in responses[0]["files"] if x]))))
 
-                file_name = f"bunkrr_upload_{int(time.time())}.csv"
-                with open(file_name, "w", newline="") as csvfile:
-                    logger.info(f"Saving uploaded files to {file_name}")
-                    csv_writer = csv.DictWriter(csvfile, dialect="excel", fieldnames=response_fields)
-                    csv_writer.writeheader()
-                    for row in responses:
-                        csv_writer.writerow(row["files"][0])
+                    file_name = f"bunkrr_upload_{int(time.time())}.csv"
+                    with open(file_name, "w", newline="") as csvfile:
+                        logger.info(f"Saving uploaded files to {file_name}")
+                        csv_writer = csv.DictWriter(csvfile, dialect="excel", fieldnames=response_fields)
+                        csv_writer.writeheader()
+                        for row in responses:
+                            csv_writer.writerow(row["files"][0])
 
-            else:
-                pprint(responses)
+                else:
+                    pprint(responses)
+            finally:
+                for temp_file in self.temporary_files:
+                    logger.info(f"Deleting temporary file: {temp_file}")
+                    if self.options["delete_temp_files"]:
+                        temp_file.unlink(missing_ok=True)
 
 
 async def async_main() -> None:
     args = cli()
     logger.debug(args)
 
-    options = {"save": args.save, "chunk_retries": args.chunk_retries}
+    options = {
+        "save": args.save,
+        "chunk_retries": args.chunk_retries,
+        "public": args.public,
+        "delete_temp_files": args.delete_temp_files,
+    }
 
     bunkrr_client = BunkrrUploader(args.token, max_connections=args.connections, retries=args.retries, options=options)
     try:

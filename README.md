@@ -2,15 +2,15 @@
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/BunkrrUploader) ![PyPI - Version](https://img.shields.io/pypi/v/BunkrrUploader)
 
 A python script to upload files or directories to Bunkrro
-Built using `asyncio`, `aiohttp`, and `tqdm`
+Built using `asyncio`, `aiohttp`, `multivolumefile` and `tqdm`
 
 ## Supports
 - Bunkrr accounts
-- TODO: Private and public directory uploads
+- Automatically making directories public or private
 - Parallel uploads
 - Retries
 - Progress bars
-- TODO: Upload logging
+- Upload logging
 - TODO: Skipping duplicate uploads
 
 ## Usage
@@ -96,7 +96,7 @@ directory/
 
 # Development
 ## Optional Prerequesites
-- tk `sudo pacman -S base-devel tk`
+- tk `sudo pacman -S base-devel tk just`
 - [pyenv](https://github.com/pyenv/pyenv?tab=readme-ov-file#set-up-your-shell-environment-for-pyenv)
 - [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv?tab=readme-ov-file#installing-as-a-pyenv-plugin)
 
@@ -111,15 +111,15 @@ pre-commit install
 ```
 
 ## Packaging
-```bash
-python3 -m build
-python3 -m twine upload --skip-existing --repository pypi dist/*
-```
+This package currently uses [just](https://github.com/casey/just which is a Makefile like utility.
+
+You must install `just` first and then you can do things like `just build` or `just release` which depend on the `justfile` to take actions.
 
 
 # Improvements Wishlist
 - [ ] Update README
-- [ ] Make it work
+- [ ] Check zipfile over 4G
+- [ ] Rework upload retries, failed files should get put back onto the queue for reuploading
 - [ ] Add file zipping and cleanup
 - [ ] Add tests
 - [ ] Add github runners for tests

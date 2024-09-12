@@ -1,4 +1,5 @@
 from typing import List, TypedDict
+from datetime import datetime
 
 
 class ChunkSize(TypedDict):
@@ -72,18 +73,59 @@ class UploadResponse(TypedDict):
     files: List[File]
 
 
-class AlbumItemResponse(TypedDict):
-    id: int
-    name: str
-    identifier: str
-
-
-class AlbumsResponse(TypedDict):
-    success: bool
-    albums: List[AlbumItemResponse]
-    count: int
-
-
 class CreateAlbumResponse(TypedDict):
     success: bool
     id: int
+
+
+class Album(TypedDict):
+    id: int
+    name: str
+    identifier: str
+    enabled: int
+    timestamp: int
+    editedAt: int
+    zipGeneratedAt: int
+    download: bool
+    public: bool
+    description: str
+    uploads: int
+    size: int
+    zipSize: None
+    descriptionHtml: str
+
+
+class GetAlbumsResponse(TypedDict):
+    success: bool
+    albums: List[Album]
+    count: int
+    homeDomain: str
+
+
+class AlbumFileItem(TypedDict):
+    id: int
+    name: str
+    original: str
+    userid: int
+    size: str
+    timestamp: int
+    slug: str
+    type: str
+    last_visited_at: str
+    expirydate: None
+    albumid: int
+    node_id: int
+    cdn: str
+    extname: str
+    basedomain: str
+    finalurl: str
+    thumb: str
+
+
+class GetAlbumResponse(TypedDict):
+    success: bool
+    files: List[AlbumFileItem]
+    count: int
+    albums: dict[str, str]
+    basedomain: str
+

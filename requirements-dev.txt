@@ -1,5 +1,6 @@
 aiohttp
 tqdm
+multivolumefile
 black
 isort
 pre-commit
