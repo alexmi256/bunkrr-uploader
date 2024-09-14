@@ -19,7 +19,7 @@ class ProgressFileReader(BufferedReader):
         if not calc_sz:
             calc_sz = self.length - self.tell()
         if self.__read_callback:
-            self.__read_callback(self.tell(), round(self.tell() / self.length), self.length)
+            self.__read_callback(self.tell(), 1, self.length)
         return super(ProgressFileReader, self).read(size)
 
 

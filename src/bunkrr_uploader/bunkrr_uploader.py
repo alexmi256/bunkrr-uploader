@@ -1,9 +1,8 @@
 import asyncio
 import csv
-import functools
 import logging
-import os
 import re
+import tempfile
 import time
 from pathlib import Path
 from pprint import pformat, pprint
@@ -11,9 +10,9 @@ from typing import Any, List, Optional
 
 from .api import BunkrrAPI
 from .cli import cli
+from .logging_manager import USE_MAIN_NAME, setup_logger
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARNING)
 
 
 class BunkrrUploader:
@@ -32,7 +31,7 @@ class BunkrrUploader:
 
     async def init(self):
         raw_req = await self.api.get_check()
-        logger.debug(pformat(raw_req))
+        logger.debug(dict(raw_req))
         max_file_size = raw_req.get("maxSize", "0B")
         max_chunk_size = raw_req.get("chunkSize", {}).get("max", "0B")
         default_chunk_size = raw_req.get("chunkSize", {}).get("default", "0B")
@@ -40,10 +39,11 @@ class BunkrrUploader:
 
         # Choose a chunk size, default or max
         chunk_size = default_chunk_size
-        # chunk_size = '1MB'
+        if self.options.get("use_max_chunk_size"):
+            chunk_size = max_chunk_size
 
         if max_file_size == "0B" or chunk_size == "0B":
-            raise Exception("Invalid max file size or chunk size")
+            raise ValueError("Invalid max file size or chunk size")
 
         # TODO: check if either one is 0 and abort
 
@@ -66,7 +66,7 @@ class BunkrrUploader:
         self.api.chunk_size = units_calculated[1]
 
     def prepare_file_for_upload(self, file: Path) -> List[Path]:
-        file_size = os.stat(file).st_size
+        file_size = file.stat().st_size
 
         # TODO: Truncate the file name if it is too long
         file_name = (file.name[:240] + "..") if len(file.name) > 240 else file.name
@@ -86,18 +86,19 @@ class BunkrrUploader:
         if path.is_file():
             paths = [path]
         else:
-            paths = [x for x in path.iterdir() if x.is_file()]
+            logger.warning(f"only files at the root of the input folder will be uploaded (no recursion)")
+            paths = sorted([x for x in path.iterdir() if x.is_file()], key=lambda p: str(p))
             if folder is None:
                 folder = path.name
+
+        if len(paths) == 0:
+            logger.error("No file paths left to upload")
+            return
 
         # The server may not accept certain file types and those over a certain size so we need to create temporary files
         filtered_paths = []
         for file_path in paths:
             filtered_paths.extend(self.prepare_file_for_upload(file_path))
-
-        if len(paths) == 0:
-            print("No file paths left to upload")
-            return
 
         # TODO: Delete the extra created files after upload
         self.temporary_files = [x for x in filtered_paths if x not in paths]
@@ -109,16 +110,19 @@ class BunkrrUploader:
             if existing_folder:
                 folder_id = str(existing_folder["id"])
             else:
+                logger.debug(f"album '{folder}' does not exists, creating")
                 created_folder = await self.api.create_album(folder, folder)
                 folder_id = str(created_folder["id"])
+            logger.debug(f"album id: '{folder_id}'")
 
         if paths:
             responses = await self.api.upload_files(filtered_paths, folder_id)
-            # pprint(responses)
 
-            if self.options.get("save") is True and responses:
+            if self.options.get("save") and responses:
                 expected_fieldnames = ["albumid", "filePathMD5", "fileNameMD5", "filePath", "fileName", "uploadSuccess"]
-                response_fields = list(set(expected_fieldnames + list(set().union(*[x.keys() for x in responses[0]["files"] if x]))))
+                response_fields = list(
+                    set(expected_fieldnames + list(set().union(*[x.keys() for x in responses[0]["files"] if x])))
+                )
 
                 file_name = f"bunkrr_upload_{int(time.time())}.csv"
                 with open(file_name, "w", newline="") as csvfile:
@@ -134,15 +138,21 @@ class BunkrrUploader:
 
 async def async_main() -> None:
     args = cli()
-    logger.debug(args)
+    setup_logger(
+        log_file=USE_MAIN_NAME,
+        log_level=logging.DEBUG if args.verbose else logging.INFO,
+        logs_folder_overrride=Path(__file__).parents[-3] / "logs",
+    )
 
-    options = {"save": args.save, "chunk_retries": args.chunk_retries}
+    logger.debug(dict(vars(args)))
+
+    options = {"save": args.save, "chunk_retries": args.chunk_retries, "use_max_chunk_size": args.max_chunk_size}
 
     bunkrr_client = BunkrrUploader(args.token, max_connections=args.connections, retries=args.retries, options=options)
     try:
         await bunkrr_client.init()
         if args.dry_run:
-            print("Dry run only, uploading skipped")
+            logger.warning("Dry run only, uploading skipped")
         else:
             await bunkrr_client.upload_files(args.file, folder=args.folder)
     finally:
