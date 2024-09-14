@@ -1,5 +1,6 @@
 aiohttp
 tqdm
+rich
 black
 isort
 pre-commit

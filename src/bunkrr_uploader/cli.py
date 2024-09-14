@@ -5,7 +5,8 @@ from pathlib import Path
 
 def cli():
     parser = argparse.ArgumentParser(prog="bunkrr-upload", description="Bunkrr Uploader supporting parallel uploads")
-    parser.add_argument("file", type=Path, help="File or directory to look for files in to upload")
+
+    parser.add_argument("file", type=Path, metavar="FILE|DIR", help="File or directory to look for files in to upload")
     parser.add_argument(
         "-t",
         "--token",
@@ -17,12 +18,7 @@ def cli():
     parser.add_argument(
         "-f", "--folder", type=str, help="Folder to upload files to overriding the directory name if used"
     )
-    parser.add_argument(
-        "-d",
-        "--dry-run",
-        action="store_true",
-        help="Don't create folders or upload files",
-    )
+    parser.add_argument("-d", "--dry-run", action="store_true", help="Don't create albums or upload files")
     parser.add_argument(
         "--max-chunk-size",
         action="store_true",
@@ -39,7 +35,7 @@ def cli():
         "--save",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help='Don\'t save uploaded file urls to a "gofile_upload_<unixtime>.csv" file',
+        help='Don\'t save uploaded file urls to a "bunkrr_upload_<unixtime>.csv" file',
     )
     parser.add_argument(
         "--use-config",
@@ -60,6 +56,7 @@ def cli():
         type=int,
         help="How many times to retry a failed chunk or chunk completion",
     )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show debug information")
     args = parser.parse_args()
 
     return args

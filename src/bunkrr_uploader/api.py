@@ -5,10 +5,11 @@ import mimetypes
 import os
 import uuid
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pformat
 from typing import Any, BinaryIO, Optional, Union
 
 import aiohttp
+from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
 from .types import (
@@ -22,7 +23,6 @@ from .types import (
 from .util import ProgressFileReader, TqdmUpTo
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
 
 class BunkrrAPI:
@@ -104,7 +104,8 @@ class BunkrrAPI:
 
         # Iterates all chunks
         while chunk_index < total_chunks:
-            # logger.debug(f"Processing chunk {chunk_index + 1}/{total_chunks} for {file_name}")
+            with tqdm.external_write_mode():
+                logger.debug(f"Processing chunk {chunk_index + 1}/{total_chunks} for {file_name}")
 
             chunk_data = file_data.read(self.chunk_size)
             chunk_upload_success = False
@@ -140,14 +141,16 @@ class BunkrrAPI:
                             chunk_upload_success = True
                         else:
                             msg = f"{file_uuid} failed uploading chunk #{chunk_index}/{total_chunks} to {server} [{chunk_upload_attempt}/{self.max_chunk_retries}]"
-                            logger.error(msg)
+                            with tqdm.external_write_mode():
+                                logger.error(msg)
                             raise Exception(msg)
                 except Exception:
                     chunk_upload_attempt += 1
 
             if chunk_upload_success is False:
-                msg = f"Failed uploading chunks for {file_uuid} too many times times to {server}, cannot continue"
-                logger.error(msg)
+                msg = f"Failed uploading chunks for {file_uuid} too many times to {server}, cannot continue"
+                with tqdm.external_write_mode():
+                    logger.error(msg)
                 raise Exception(msg)
 
     # TODO: This should probably move out of API
@@ -169,12 +172,14 @@ class BunkrrAPI:
         file_mimetype = mimetypes.guess_type(file)[0] or "application/octet-stream"
         node_response = await self.get_node()
         if not node_response.get("success"):
-            logger.error(f"Failed to get server to upload to: {pformat(node_response)}")
+            with tqdm.external_write_mode():
+                logger.error(f"Failed to get server to upload to: {pformat(node_response)}")
             return metadata
         server = "/".join(node_response["url"].split("/")[:3])
 
         if server not in self.server_sessions:
-            logger.info(f"Using new server connection to {server}")
+            with tqdm.external_write_mode():
+                logger.info(f"Using new server connection to {server}")
             self.server_sessions[server] = aiohttp.ClientSession(server, headers=self.session_headers)
 
         session = self.server_sessions[server]
@@ -210,7 +215,8 @@ class BunkrrAPI:
 
                                         return response
                                 else:
-                                    logger.debug(f"{file.name} will use UUID {file_uuid}")
+                                    with tqdm.external_write_mode():
+                                        logger.debug(f"{file.name} will use UUID {file_uuid}")
                                     await self.upload_chunks(
                                         file_data, file.name, file_uuid, file_size, session, server
                                     )
@@ -236,7 +242,8 @@ class BunkrrAPI:
                                                 response = await resp.json()
                                                 if response.get("success") is False:
                                                     msg = f"{file_uuid} failed finishing chunks to {server} [{finish_chunks_attempt + 1}/{self.max_chunk_retries}]\n{pformat(response)}"
-                                                    logger.error(msg)
+                                                    with tqdm.external_write_mode():
+                                                        logger.error(msg)
                                                     raise Exception(msg)
                                                 # chunk_upload_success = True
                                                 response.update(metadata)
@@ -247,15 +254,17 @@ class BunkrrAPI:
                                                 raise
                                     # TODO: Should probably return here
                 except Exception:
-                    logger.exception(f"Upload failed for {file.name} to {server} Attempt #{retries + 1}")
+                    with tqdm.external_write_mode():
+                        logger.exception(f"Upload failed for {file.name} to {server} Attempt #{retries + 1}")
                     retries += 1
             return {"success": False, "files": [{"name": file.name, "url": ""}]}
 
     # TODO: This should probably move out of API
     async def upload_files(self, paths: list[Path], folder_id: Optional[str] = None) -> list[UploadResponse]:
+
         try:
             tasks = [self.upload(test_file, folder_id) for i, test_file in enumerate(paths)]
-            responses = await tqdm_asyncio.gather(*tasks, desc="Files uploaded")
+            responses = await tqdm_asyncio.gather(*tasks, desc="Files uploaded", position=0, leave=False)
             return responses
         finally:
             # This should happen in the API client itself
