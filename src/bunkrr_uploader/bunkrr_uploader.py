@@ -45,8 +45,6 @@ class BunkrrUploader:
         if max_file_size == "0B" or chunk_size == "0B":
             raise Exception("Invalid max file size or chunk size")
 
-        # TODO: check if either one is 0 and abort
-
         units_to_calc = [max_file_size, chunk_size]
         units_calculated = []
 
@@ -104,8 +102,19 @@ class BunkrrUploader:
 
         folder_id = None
         if folder:
-            existing_folders = await self.api.get_albums()
-            existing_folder = next((x for x in existing_folders["albums"] if x["name"] == folder), None)
+            # ← patched: fetch *all* album pages so names beyond #50 aren’t missed
+            all_albums = []
+            page = 1
+            while True:
+                resp = await self.api.session.get(f"/api/albums?page={page}")
+                data = await resp.json()
+                all_albums.extend(data["albums"])
+                if len(data["albums"]) < 50:
+                    break
+                page += 1
+
+            existing_folder = next((x for x in all_albums if x["name"] == folder), None)
+
             if existing_folder:
                 folder_id = str(existing_folder["id"])
             else:
